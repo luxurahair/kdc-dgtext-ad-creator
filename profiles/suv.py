@@ -7,13 +7,13 @@ def build(vehicle: dict) -> tuple[str, str]:
     loc = (vehicle.get("location") or "").strip() or "Saint-Georges (Beauce)"
 
     bullets = [
-        "🛻 Pickup robuste • polyvalent",
-        "🔧 Prêt pour travail & loisirs",
-        "✅ Inspection & prêt à partir"
+        "🚙 VUS spacieux • confortable",
+        "🛡️ Sécurité & stabilité 4 saisons",
+        "✅ Parfait famille & roadtrips"
     ]
 
     mp = (
-        f"🔥 {title} — CAMION ROBUSTE 🔥\n\n"
+        f"🔥 {title} — VUS PARFAIT 🔥\n\n"
         f"💰 {price} $\n"
         f"📊 {km} km\n"
         f"🧾 Stock : {stock}\n"
@@ -21,7 +21,7 @@ def build(vehicle: dict) -> tuple[str, str]:
         + "\n".join(bullets) + "\n\n"
         f"📍 {loc}\n"
         f"📩 Écris-moi en privé — réponse rapide\n"
-        f"#RAM #Truck #Pickup #DanielGiroux #Beauce"
+        f"#VUS #SUV #DanielGiroux #Beauce"
     ).strip()
 
     if len(mp) > 790:
@@ -34,7 +34,7 @@ def build(vehicle: dict) -> tuple[str, str]:
         f"🧾 Stock : {stock}\n"
         f"🔢 VIN : {vin}\n"
         f"📍 {loc}\n\n"
-        "Camion conçu pour ceux qui veulent de la capacité et de la polyvalence.\n"
+        "VUS idéal pour le Québec : confort, sécurité, espace.\n"
         "📩 Daniel Giroux — je réponds vite."
     )
     return fb, mp
