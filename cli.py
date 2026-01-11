@@ -1,13 +1,18 @@
+cat > cli.py <<'PY'
 import argparse, json
 from pathlib import Path
 
 from engine.classifier import classify
-from profiles import exotic, default
+from profiles import exotic, truck, suv, default
 
 def build_texts(vehicle: dict) -> tuple[str, str]:
     kind = classify(vehicle)
     if kind == "exotic":
         return exotic.build(vehicle)
+    if kind == "truck":
+        return truck.build(vehicle)
+    if kind == "suv":
+        return suv.build(vehicle)
     return default.build(vehicle)
 
 def main():
@@ -30,3 +35,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+PY
