@@ -1,38 +1,14 @@
 import argparse, json
 from pathlib import Path
 
+from engine.classifier import classify
+from profiles import exotic, default
+
 def build_texts(vehicle: dict) -> tuple[str, str]:
-    title = (vehicle.get("title") or "").strip()
-    price = vehicle.get("price", "")
-    km = vehicle.get("km", "")
-    stock = (vehicle.get("stock") or "").strip()
-    vin = (vehicle.get("vin") or "").strip()
-    loc = (vehicle.get("location") or "").strip()
-
-    marketplace = (
-        f"🔥 {title} 🔥\n"
-        f"💰 {price} $\n"
-        f"📊 {km} km\n"
-        f"🧾 Stock : {stock}\n"
-        f"🔢 VIN : {vin}\n"
-        f"📍 {loc}\n"
-        f"📩 Écris-moi en privé"
-    )
-
-    # Marketplace safe limit (<800). On garde marge.
-    if len(marketplace) > 790:
-        marketplace = marketplace[:790].rsplit("\n", 1)[0]
-
-    facebook = (
-        f"🔥 {title} 🔥\n\n"
-        f"💰 {price} $\n"
-        f"📊 {km} km\n"
-        f"🧾 Stock : {stock}\n"
-        f"🔢 VIN : {vin}\n"
-        f"📍 {loc}\n\n"
-        f"📩 Daniel Giroux — je réponds vite."
-    )
-    return facebook, marketplace
+    kind = classify(vehicle)
+    if kind == "exotic":
+        return exotic.build(vehicle)
+    return default.build(vehicle)
 
 def main():
     ap = argparse.ArgumentParser()
@@ -48,6 +24,7 @@ def main():
     (out / "facebook_dg.txt").write_text(fb, encoding="utf-8")
     (out / "marketplace.txt").write_text(mp, encoding="utf-8")
 
+    print("✅ profile:", classify(vehicle))
     print("✅ Wrote:", out / "facebook_dg.txt")
     print("✅ Wrote:", out / "marketplace.txt")
 
