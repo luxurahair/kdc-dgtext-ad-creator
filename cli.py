@@ -1,4 +1,3 @@
-cat > cli.py <<'PY'
 import argparse
 import json
 import os
@@ -9,6 +8,7 @@ load_dotenv()
 
 from engine.classifier import classify
 
+
 def build_fallback(vehicle: dict, kind: str) -> tuple[str, str]:
     from profiles import exotic, truck, suv, default
     if kind == "exotic":
@@ -18,6 +18,7 @@ def build_fallback(vehicle: dict, kind: str) -> tuple[str, str]:
     if kind == "suv":
         return suv.build(vehicle)
     return default.build(vehicle)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -45,6 +46,6 @@ def main():
     print("✅ Wrote:", out / "facebook_dg.txt")
     print("✅ Wrote:", out / "marketplace.txt")
 
+
 if __name__ == "__main__":
     main()
-PY
