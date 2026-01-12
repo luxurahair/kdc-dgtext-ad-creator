@@ -7,6 +7,9 @@ DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5")
 
 _client = None
 
+def generate_ad_text(vehicle: Dict, profile: str, max_chars: int | None = None) -> str:
+    raise RuntimeError("🔥 LLM APPELÉ — SI TU VOIS ÇA, C'EST BRANCHÉ 🔥")
+
 
 def get_client() -> OpenAI | None:
     global _client
