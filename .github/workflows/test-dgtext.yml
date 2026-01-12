@@ -1,0 +1,41 @@
+name: Test DGText via OpenAI
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install openai python-dotenv
+
+      - name: Run DGText (truck example)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-5-mini' }}
+        run: |
+          rm -rf out || true
+          python cli.py --in examples/truck_test.json --out out/
+          echo "=== MARKETPLACE ==="
+          sed -n '1,40p' out/marketplace.txt
+          echo "=== FACEBOOK ==="
+          sed -n '1,40p' out/facebook_dg.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dgtext-output
+          path: out/
