@@ -25,7 +25,7 @@ jobs:
       - name: Run DGText (truck example)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-5-mini' }}
+          OPENAI_MODEL: gpt-5-mini
         run: |
           rm -rf out || true
           python cli.py --in examples/truck_test.json --out out/
