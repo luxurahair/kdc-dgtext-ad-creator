@@ -1,14 +1,16 @@
-import argparse, json, os
+cat > cli.py <<'PY'
+import argparse
+import json
+import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 load_dotenv()
 
 from engine.classifier import classify
-from engine.llm import generate_ad_text
-from profiles import exotic, truck, suv, default
-
 
 def build_fallback(vehicle: dict, kind: str) -> tuple[str, str]:
+    from profiles import exotic, truck, suv, default
     if kind == "exotic":
         return exotic.build(vehicle)
     if kind == "truck":
@@ -16,7 +18,6 @@ def build_fallback(vehicle: dict, kind: str) -> tuple[str, str]:
     if kind == "suv":
         return suv.build(vehicle)
     return default.build(vehicle)
-
 
 def main():
     ap = argparse.ArgumentParser()
@@ -30,8 +31,8 @@ def main():
     out = Path(args.outdir)
     out.mkdir(parents=True, exist_ok=True)
 
-    # 🔥 PRIORITÉ AU LLM
     if os.getenv("OPENAI_API_KEY"):
+        from engine.llm import generate_ad_text
         fb = generate_ad_text(vehicle, kind)
         mp = generate_ad_text(vehicle, kind, max_chars=800)
     else:
@@ -44,6 +45,6 @@ def main():
     print("✅ Wrote:", out / "facebook_dg.txt")
     print("✅ Wrote:", out / "marketplace.txt")
 
-
 if __name__ == "__main__":
     main()
+PY
