@@ -1,5 +1,7 @@
 import argparse, json, os
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
 from engine.classifier import classify
 from engine.llm import generate_ad_text
