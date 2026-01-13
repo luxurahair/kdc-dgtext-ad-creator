@@ -3,13 +3,13 @@
 """
 Marketplace Smart — générateur d'annonces Marketplace punchées (≤ 800 caractères)
 - Pensé pour les véhicules WITHOUT (pas de window sticker)
-- Compatible avec les valeurs DG : clair, vendeur, pas d'invention d'options.
+- Déterministe, clair, vendeur, sans chiffres/specs inventés.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import re
 
 
@@ -27,7 +27,6 @@ def _shorten(s: str, limit: int) -> str:
     s = _norm(s)
     if len(s) <= limit:
         return s
-    # coupe au dernier séparateur avant limit
     cut = s[:limit]
     for sep in ["\n", " • ", " | ", " - ", ". "]:
         i = cut.rfind(sep)
@@ -39,12 +38,11 @@ def _fmt_money(x: Any) -> str:
     if x is None:
         return ""
     if isinstance(x, (int, float)):
-        # format fr-CA simple avec espaces
         v = int(round(float(x)))
         s = f"{v:,}".replace(",", " ")
         return f"{s} $"
     s = str(x).strip()
-    return s
+    return "" if s.lower() in ("none", "null", "0", "0.0") else s
 
 def _fmt_km(x: Any) -> str:
     if x is None:
@@ -54,7 +52,7 @@ def _fmt_km(x: Any) -> str:
         s = f"{v:,}".replace(",", " ")
         return f"{s} km"
     s = str(x).strip()
-    return s
+    return "" if s.lower() in ("none", "null", "0", "0.0") else s
 
 def _first_word(title: str) -> str:
     t = _norm(title).split()
@@ -75,10 +73,11 @@ def _detect_brand(title: str) -> str:
 def _classify(title: str, price: Optional[float] = None) -> str:
     low = _norm(title).lower()
     brand = _detect_brand(title).lower()
-    # exotic
-    if any(x in low for x in ["ferrari","lamborghini","mclaren","488","huracan","aventador","720s","gt3","gt2","911 turbo","488 gtb","f8","roma"]):
+
+    # exotic / luxury (heuristique)
+    if any(x in low for x in ["ferrari","lamborghini","mclaren","huracan","aventador","720s","gt3","gt2","911 turbo","f8","roma"]):
         return "exotic"
-    if brand in ["bentley","rolls","aston Martin".lower(),"maserati"] or (price is not None and price >= 120000):
+    if brand in ["bentley","rolls","aston martin","maserati"] or (price is not None and price >= 120000):
         return "luxury"
     if any(x in low for x in ["ram","f-150","f150","silverado","sierra","tundra","tacoma","super duty","2500","3500"]):
         return "truck"
@@ -101,26 +100,24 @@ class Profile:
     proof: str
     hashtags: List[str]
 
-def get_profile(title: str, year: Any = None) -> Profile:
+def get_profile(title: str, price_val: Optional[float] = None) -> Profile:
     brand = _detect_brand(title)
-    cat = _classify(title)
+    cat = _classify(title, price=price_val)
 
-    # Par défaut : punch + crédible (pas d'options inventées)
     base_hashtags = ["#DanielGiroux", "#Beauce", "#SaintGeorges", "#Quebec"]
 
-    if cat == "exotic" and "488" in _norm(title).lower() and "ferrari" in _norm(title).lower():
-        # Specs "génériques" 488 GTB (pas un claim d'options)
+    # ❗ Aucun chiffre “générique” ici.
+    if cat == "exotic":
         return Profile(
             category="exotic",
-            headline=f"🔥 {brand} 488 GTB — Supercar d’exception 🔥",
+            headline=f"💎 {title} — Prestigieux & rare 💎",
             bullets=[
-                "💥 V8 biturbo 3.9L",
-                "⚡ ~661 hp | 0–100 km/h ~3.0 s",
-                "🏎️ Boîte F1 double embrayage (7 rapports)",
                 "🎯 Prestige • performance • exclusivité",
+                "✨ Présence et finition haut de gamme",
+                "✅ Inspection complète — prêt à partir",
             ],
-            proof="Sans Window Sticker (WITHOUT) — infos factuelles, rien d’inventé.",
-            hashtags=["#Ferrari", "#Ferrari488", "#488GTB", "#Supercar", "#Exotique", "#V8Biturbo"] + base_hashtags,
+            proof="WITHOUT — texte basé sur infos disponibles, sans options inventées.",
+            hashtags=[f"#{brand}", "#Exotique", "#Supercar", "#AutoDePrestige"] + base_hashtags,
         )
 
     if cat == "truck":
@@ -130,10 +127,10 @@ def get_profile(title: str, year: Any = None) -> Profile:
             bullets=[
                 "💪 Solide, fiable, prêt à partir",
                 "🧰 Parfait pour chantier / remorquage / famille",
-                "✅ Inspection complète",
+                "✅ Inspection complète — prêt à partir",
             ],
-            proof="WITHOUT — texte basé sur données réelles (pas d’options inventées).",
-            hashtags=["#Truck", "#Pickup", "#4x4", "#Camion"] + base_hashtags,
+            proof="WITHOUT — texte basé sur infos disponibles, sans options inventées.",
+            hashtags=["#Truck", "#Pickup", "#Camion"] + base_hashtags,
         )
 
     if cat == "luxury":
@@ -143,10 +140,10 @@ def get_profile(title: str, year: Any = None) -> Profile:
             bullets=[
                 "✨ Confort haut de gamme",
                 "🎯 Image premium, conduite douce",
-                "✅ Inspection complète",
+                "✅ Inspection complète — prêt à partir",
             ],
-            proof="WITHOUT — infos réelles, pas de promesses floues.",
-            hashtags=["#Luxe", "#AutoDeLuxe", "#Premium"] + base_hashtags,
+            proof="WITHOUT — clair et crédible, sans promesses inventées.",
+            hashtags=["#Luxe", "#Premium", "#AutoDeLuxe"] + base_hashtags,
         )
 
     if cat == "sport":
@@ -154,9 +151,9 @@ def get_profile(title: str, year: Any = None) -> Profile:
             category="sport",
             headline=f"⚡ {title} — Performance au quotidien ⚡",
             bullets=[
-                "🔥 Sensations + look",
+                "🔥 Look + sensations",
                 "🎯 Tenue de route & plaisir",
-                "✅ Inspection complète",
+                "✅ Inspection complète — prêt à partir",
             ],
             proof="WITHOUT — clair, net, vendeur.",
             hashtags=["#Sport", "#Performance", "#PassionAuto"] + base_hashtags,
@@ -165,12 +162,12 @@ def get_profile(title: str, year: Any = None) -> Profile:
     # daily / suv fallback
     return Profile(
         category=cat,
-        headline=f"🔥 {title} — Excellent rapport qualité/prix 🔥",
+        headline=f"🔥 {title} — Bon rapport qualité/prix 🔥",
         bullets=[
-            "✅ Inspection complète",
-            "🚗 Prête à partir",
+            "✅ Inspection complète — prêt à partir",
+            "🚗 Idéal au quotidien",
         ],
-        proof="WITHOUT — infos réelles, rien d’inventé.",
+        proof="WITHOUT — infos disponibles, rien d’inventé.",
         hashtags=["#Auto", "#VehiculeOccasion"] + base_hashtags,
     )
 
@@ -185,57 +182,49 @@ def generate_marketplace_text(
     include_hashtags: bool = True,
 ) -> str:
     title = _norm(str(vehicle.get("title") or "")).strip()
-    year = vehicle.get("year") or ""
+    if not title:
+        return "Annonce indisponible (titre manquant).\n"
+
+    price_val = vehicle.get("price") if isinstance(vehicle.get("price"), (int, float)) else None
     price = _fmt_money(vehicle.get("price"))
     km = _fmt_km(vehicle.get("km") or vehicle.get("mileage"))
     stock = _norm(str(vehicle.get("stock") or "")).upper()
-    vin = _norm(str(vehicle.get("vin") or "")).upper()
+    location = _norm(str(vehicle.get("location") or "")).strip()
 
-    prof = get_profile(title, year=year)
+    prof = get_profile(title, price_val=price_val)
 
     lines: List[str] = []
-    # Headline
     lines.append(prof.headline)
 
-    # Placeholders / infos clés (garder de la place)
+    # ✅ Pas de placeholders : on affiche seulement si présent
     if price:
         lines.append(f"💰 Prix : {price}")
-    else:
-        lines.append("💰 Prix : ____ $")
     if km:
         lines.append(f"📊 Km : {km}")
-    else:
-        lines.append("📊 Km : ____ km")
-
     if stock:
         lines.append(f"🧾 Stock : {stock}")
-    else:
-        lines.append("🧾 Stock : ____")
-
-    if vin:
-        lines.append(f"🔢 VIN : {vin}")
-    else:
-        lines.append("🔢 VIN : _____________")
 
     lines.append("")  # respiration
 
-    # Bullets punch (sans inventer d'options)
     for b in prof.bullets:
-        lines.append(b)
+        if _norm(b):
+            lines.append(_norm(b))
 
     lines.append(prof.proof)
 
     # CTA DG
     lines.append("📩 Écris-moi en privé — réponse rapide.")
-    lines.append("📍 Saint-Georges (Beauce)")
+    if location:
+        lines.append(f"📍 {location}")
+    else:
+        lines.append("📍 Saint-Georges (Beauce)")
 
     if include_hashtags and prof.hashtags:
-        # Marketplace coupe parfois les hashtags : on les met en 1 ligne
-        tagline = " ".join(prof.hashtags)
-        lines.append(tagline)
+        lines.append(" ".join(prof.hashtags))
 
-    text = "\n".join([l for l in lines if l is not None]).strip()
-    # Enforce char limit
+    text = "\n".join(lines).strip()
+
     if len(text) > char_limit:
         text = _shorten(text, char_limit)
+
     return text + "\n"
