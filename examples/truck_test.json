@@ -1,9 +1,11 @@
 {
-  "stock": "06193",
   "title": "RAM 1500 Classic SLT 2022",
-  "brand": "RAM",
+  "brand": "Ram",
+  "year": 2022,
   "price": 34995,
-  "km": 58907,
-  "vin": "VIN_ICI",
-  "location": "Saint-Georges (Beauce)"
+  "km": 56000,
+  "stock": "06193",
+  "location": "Saint-Georges (Beauce)",
+  "characteristics": ["V8", "4x4", "Cabine d’équipe", "SLT", "Camion propre", "Prêt à partir"],
+  "notes": "Photos sur demande. Disponible rapidement."
 }
