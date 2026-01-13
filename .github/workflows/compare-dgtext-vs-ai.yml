@@ -1,0 +1,80 @@
+name: Compare DGText vs AI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "engine/**"
+      - "profiles/**"
+      - "cli.py"
+      - "examples/**"
+      - ".github/workflows/compare-dgtext-vs-ai.yml"
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Clean out
+        run: rm -rf out && mkdir -p out
+
+      # 1) DGText deterministic (no AI)
+      - name: Run DGText deterministic (fallback)
+        env:
+          # Force empty to ensure fallback path is used even if secrets exist elsewhere
+          OPENAI_API_KEY: ""
+        run: |
+          python cli.py --in examples/truck_test.json --out out/dgtext
+
+      # 2) AI optional (only if secret exists)
+      - name: Run AI (optional)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -n "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY present -> running AI"
+            python cli.py --in examples/truck_test.json --out out/ai
+          else
+            echo "No OPENAI_API_KEY -> skipping AI run"
+            mkdir -p out/ai
+            echo "SKIPPED (no OPENAI_API_KEY)" > out/ai/README.txt
+          fi
+
+      # 3) Show diff in logs (nice quick view)
+      - name: Diff outputs (logs)
+        run: |
+          echo "=== FILES ==="
+          find out -maxdepth 2 -type f -print
+          echo ""
+          echo "=== DIFF (facebook) ==="
+          if [ -f out/dgtext/facebook_dg.txt ] && [ -f out/ai/facebook_dg.txt ]; then
+            diff -u out/dgtext/facebook_dg.txt out/ai/facebook_dg.txt || true
+          else
+            echo "No comparable facebook files (AI may be skipped)."
+          fi
+          echo ""
+          echo "=== DIFF (marketplace) ==="
+          if [ -f out/dgtext/marketplace.txt ] && [ -f out/ai/marketplace.txt ]; then
+            diff -u out/dgtext/marketplace.txt out/ai/marketplace.txt || true
+          else
+            echo "No comparable marketplace files (AI may be skipped)."
+          fi
+
+      # 4) Upload artifacts so you can download both versions
+      - name: Upload artifacts (outputs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: compare_outputs
+          path: out
