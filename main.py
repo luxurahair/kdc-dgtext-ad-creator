@@ -1,48 +1,45 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Any, Dict, Optional
-
-@app.get("/")
-def root():
-    return {"ok": True, "service": "kenbot-text-engine"}
-
-@app.get("/health")
-
-def health():
-    return {"ok": True}
-# Ton pipeline texte (à ajuster selon ton repo)
-# 1) Si tu as engine/text_pipeline.py avec une fonction stable
-try:
-    from engine.text_pipeline import build_publish_text  # ou generate_facebook_text
-except Exception:
-    build_publish_text = None
+from typing import Any, Dict
 
 app = FastAPI(title="kenbot-text-engine", version="1.0")
+
 
 class Job(BaseModel):
     slug: str
     event: str = "NEW"
     vehicle: Dict[str, Any]
 
+
+@app.get("/")
+def root():
+    return {"ok": True, "service": "kenbot-text-engine"}
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
 
+
 @app.post("/generate")
 def generate(job: Job):
-    if build_publish_text is None:
-        raise HTTPException(
-            status_code=500,
-            detail="text_pipeline introuvable. Vérifie engine/text_pipeline.py et le nom de la fonction.",
-        )
+    """
+    MVP: retourne un texte simple.
+    Ensuite on branche engine/text_pipeline.py.
+    """
+    v = job.vehicle or {}
+    title = (v.get("title") or "").strip()
+    price = (v.get("price") or "").strip()
+    mileage = (v.get("mileage") or "").strip()
 
-    try:
-        # Ton pipeline attend probablement vehicle + (options/sticker_lines) selon ton code.
-        # Ici on passe juste vehicle; adapte si ta fonction demande plus.
-        text = build_publish_text(job.vehicle)  # <-- si signature différente, on ajuste
-        text = (text or "").strip()
-        if not text:
-            raise ValueError("texte vide")
-        return {"slug": job.slug, "facebook_text": text + "\n"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if not title:
+        raise HTTPException(status_code=400, detail="vehicle.title manquant")
+
+    lines = [f"🔥 {title} 🔥", ""]
+    if price:
+        lines.append(f"💥 {price} 💥")
+    if mileage:
+        lines.append(f"📊 {mileage}")
+    text = "\n".join(lines).strip() + "\n"
+
+    return {"slug": job.slug, "facebook_text": text}
