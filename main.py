@@ -2,6 +2,14 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
+@app.get("/")
+def root():
+    return {"ok": True, "service": "kenbot-text-engine"}
+
+@app.get("/health")
+
+def health():
+    return {"ok": True}
 # Ton pipeline texte (à ajuster selon ton repo)
 # 1) Si tu as engine/text_pipeline.py avec une fonction stable
 try:
