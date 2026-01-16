@@ -49,11 +49,15 @@ def generate(job: Job):
 
                 # call engine/sticker_to_ad.py (CLI)
                 script = Path(__file__).resolve().parent / "engine" / "sticker_to_ad.py"
-                out_txt = td / f"{stock}_facebook.txt"
+                if not script.exists():
+                    raise HTTPException(500, f"sticker_to_ad.py introuvable: {script}")
+
+                out_dir = td  # dossier tmp
+                expected = out_dir / f"{stock}_facebook.txt"
 
                 cmd = [
                     sys.executable, str(script), str(pdf_path),
-                    "--out", str(out_txt),
+                    "--out", str(out_dir),
                     "--title", title,
                     "--price", price,
                     "--mileage", mileage,
@@ -62,10 +66,21 @@ def generate(job: Job):
                 ]
                 p = subprocess.run(cmd, capture_output=True, text=True)
 
-                if p.returncode == 0 and out_txt.exists():
-                    full = out_txt.read_text(encoding="utf-8", errors="ignore")
-                    return {"slug": job.slug, "facebook_text": _clip_800(full)}
+                if p.returncode != 0:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"sticker_to_ad failed (code={p.returncode})\n"
+                            f"STDERR:\n{(p.stderr or '')[-1200:]}\n"
+                            f"STDOUT:\n{(p.stdout or '')[-1200:]}"
+                        ),
+                    )
 
+                if not expected.exists():
+                    raise HTTPException(500, f"sticker_to_ad OK mais fichier manquant: {expected}")
+
+                full = expected.read_text(encoding="utf-8", errors="ignore")
+                return {"slug": job.slug, "facebook_text": _clip_800(full)}
     # --- Fallback: texte court (sans options) ---
     base = f"🔥 {title} 🔥\n\n"
     if price:
