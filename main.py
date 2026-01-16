@@ -7,9 +7,6 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="kenbot-text-engine", version="1.0")
-@app.get("/version")
-def version():
-    return {"ok": True, "build": "debug-version-route"}
 
 
 class Job(BaseModel):
