@@ -68,7 +68,6 @@ def generate(job: Job):
                         raise HTTPException(500, f"sticker_to_ad.py introuvable: {script}")
 
                     out_dir = td  # dossier tmp
-                    expected = out_dir / f"{stock}_facebook.txt"
 
                     cmd = [
                         sys.executable, str(script), str(pdf_path),
@@ -79,8 +78,12 @@ def generate(job: Job):
                         "--stock", stock,
                         "--vin", vin,
                     ]
-                    p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
-                    
+
+                    try:
+                        p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+                    except subprocess.TimeoutExpired:
+                        raise HTTPException(500, "sticker_to_ad timeout (25s)")
+
                     if p.returncode != 0:
                         raise HTTPException(
                             status_code=500,
@@ -91,9 +94,47 @@ def generate(job: Job):
                             ),
                         )
 
-                    if not expected.exists():
-                        raise HTTPException(500, f"sticker_to_ad OK mais fichier manquant: {expected}")
+                    # ✅ Ne PAS supposer le nom exact : prendre le *_facebook.txt le plus récent
+                    candidates = sorted(
+                        out_dir.glob("*_facebook.txt"),
+                        key=lambda x: x.stat().st_mtime,
+                        reverse=True
+                    )
 
+                    if not candidates:
+                        generated = [x.name for x in out_dir.glob("*")]
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                "sticker_to_ad: aucun *_facebook.txt généré\n"
+                                f"generated={generated}\n"
+                                f"STDERR:\n{(p.stderr or '')[-800:]}\n"
+                                f"STDOUT:\n{(p.stdout or '')[-800:]}"
+                            ),
+                        )
+
+                    best = candidates[0]
+                    full = best.read_text(encoding="utf-8", errors="ignore")
+                    return {"slug": job.slug, "facebook_text": _clip_800(full)}
+
+        # --- Fallback: texte court (sans options) ---
+        base = f"🔥 {title} 🔥\n\n"
+        if price:
+            base += f"💥 {price} 💥\n"
+        if mileage:
+            base += f"📊 {mileage}\n"
+        if stock:
+            base += f"🧾 Stock : {stock}\n"
+        if _looks_like_vin(vin):
+            base += f"🧾 Window Sticker : https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}\n"
+
+        return {"slug": job.slug, "facebook_text": _clip_800(base)}
+
+    except HTTPException:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=tb[-2000:])
                     full = expected.read_text(encoding="utf-8", errors="ignore")
                     return {"slug": job.slug, "facebook_text": _clip_800(full)}
 
