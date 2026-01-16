@@ -79,8 +79,8 @@ def generate(job: Job):
                         "--stock", stock,
                         "--vin", vin,
                     ]
-                    p = subprocess.run(cmd, capture_output=True, text=True)
-
+                    p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+                    
                     if p.returncode != 0:
                         raise HTTPException(
                             status_code=500,
