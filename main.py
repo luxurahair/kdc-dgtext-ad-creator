@@ -85,23 +85,56 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
     except Exception:
         pass
 
-    # 2) download Chrysler
+        def is_pdf_ok(b: bytes) -> bool:
+        return bool(b) and len(b) > 60_000 and b[:4] == b"%PDF"
+
+    # 2) Chrysler direct (timeout plus court)
     pdf_url = f"https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}"
-    r = requests.get(pdf_url, timeout=60)
-    if not (r.ok and r.content.startswith(b"%PDF") and len(r.content) > 60_000):
-        raise RuntimeError("Sticker Chrysler non récupéré ou PDF invalide")
+    c = b""
+    try:
+        r = requests.get(pdf_url, timeout=20)
+        c = r.content or b""
+    except Exception:
+        c = b""
 
-    local_pdf.write_bytes(r.content)
+    # 3) Fallback lookup si direct invalide
+    if not is_pdf_ok(c):
+        lookup_url = "https://windowstickerlookup.com"
+        r2 = requests.get(
+            lookup_url,
+            params={"make": "chrysler", "vin": vin},
+            timeout=20,
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html,*/*"},
+        )
+        html = (r2.text or "")
 
-    # 3) upload Supabase Storage (cache durable)
+        m_pdf = re.search(r'(https?://[^\s"\']+\.pdf)', html, re.IGNORECASE)
+        m_ch = re.search(
+            r'(https?://www\.chrysler\.com/hostd/windowsticker/getWindowStickerPdf\.do\?vin=[A-HJ-NPR-Z0-9]{17})',
+            html,
+            re.IGNORECASE,
+        )
+        pdf2 = m_pdf.group(1) if m_pdf else (m_ch.group(1) if m_ch else None)
+        if not pdf2:
+            raise RuntimeError("Sticker indisponible (aucun lien PDF via lookup)")
+
+        r3 = requests.get(pdf2, timeout=20)
+        c = r3.content or b""
+
+        if not is_pdf_ok(c):
+            raise RuntimeError("Sticker indisponible (PDF fallback invalide)")
+
+    # PDF validé
+    local_pdf.write_bytes(c)
+
+    # upload Supabase Storage (cache durable)
     try:
         sb().storage.from_(STICKER_BUCKET).upload(
             obj_path,
-            r.content,
+            c,
             {"content-type": "application/pdf", "upsert": "true"},
         )
     except Exception:
-        # pas bloquant: on a déjà le PDF local
         pass
 
     return local_pdf
