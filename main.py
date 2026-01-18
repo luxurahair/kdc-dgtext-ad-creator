@@ -40,11 +40,14 @@ def _looks_like_vin(v: str) -> bool:
 
 
 # ==========================
-# Supabase Storage (PDF cache)
+# Supabase (DB + Storage)
 # ==========================
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+
 STICKER_BUCKET = os.getenv("SB_BUCKET_STICKERS", "kennebec-stickers").strip()
+OUTPUTS_BUCKET = os.getenv("SB_BUCKET_OUTPUTS", "kennebec-outputs").strip()
+
 _sb = None
 
 
@@ -57,7 +60,12 @@ def sb():
     return _sb
 
 
+# ==========================
+# Sticker helpers
+# ==========================
 def _sticker_obj_path(vin: str) -> str:
+    # NOTE: on garde la convention actuelle: <VIN>.pdf à la racine du bucket
+    # (on migrera vers pdf_ok/<VIN>.pdf plus tard si tu veux)
     return f"{vin.upper()}.pdf"
 
 
@@ -93,9 +101,9 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
     if not _looks_like_vin(vin):
         raise RuntimeError("VIN invalide")
 
-    obj_path = _sticker_obj_path(vin)  # garde ta convention actuelle
+    obj_path = _sticker_obj_path(vin)
     tmp_dir = Path(tempfile.mkdtemp(prefix="kb_pdf_"))
-    local_pdf = tmp_dir / Path(obj_path).name  # évite sous-dossiers tmp inutiles
+    local_pdf = tmp_dir / Path(obj_path).name
 
     # 1) download depuis Supabase Storage
     try:
@@ -106,7 +114,7 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
     except Exception:
         pass
 
-    # 2) Chrysler direct (timeout plus court)
+    # 2) Chrysler direct
     pdf_url = f"https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}"
     try:
         r = requests.get(pdf_url, timeout=20)
@@ -152,10 +160,32 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
             {"content-type": "application/pdf", "upsert": "true"},
         )
     except Exception:
-        # pas fatal : on continue avec le PDF local
         pass
 
     return local_pdf
+
+
+# ==========================
+# Outputs (Storage + DB)
+# ==========================
+def outputs_put(path: str, content: str) -> None:
+    sb().storage.from_(OUTPUTS_BUCKET).upload(
+        path,
+        content.encode("utf-8"),
+        {"content-type": "text/plain; charset=utf-8", "upsert": "true"},
+    )
+
+
+def outputs_upsert(stock: str, kind: str, fb_path: str, mp_path: str) -> None:
+    sb().table("outputs").upsert(
+        {
+            "stock": stock,
+            "kind": kind,
+            "facebook_path": fb_path,
+            "marketplace_path": mp_path,
+        }
+    ).execute()
+
 
 # ==========================
 # Routes
@@ -171,6 +201,7 @@ def version():
         "has_sticker_to_ad": True,
         "debug_traceback": True,
         "sticker_bucket": STICKER_BUCKET,
+        "outputs_bucket": OUTPUTS_BUCKET,
         "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
     }
 
@@ -182,13 +213,15 @@ def generate(job: Job):
         title = (v.get("title") or "").strip()
         price = (v.get("price") or "").strip()
         mileage = (v.get("mileage") or "").strip()
-        stock = (v.get("stock") or "").strip().upper()
+        stock = (v.get("stock") or "").strip().upper() or job.slug.strip().upper()
         vin = (v.get("vin") or "").strip().upper()
 
         if not title:
             raise HTTPException(400, "vehicle.title manquant")
 
-        # --- VIN valide -> PDF cache -> sticker_to_ad ---
+        # ==========================
+        # WITH (sticker_to_ad)
+        # ==========================
         if _looks_like_vin(vin) and price and mileage and stock:
             pdf_path = get_or_fetch_sticker_pdf(vin)
 
@@ -224,13 +257,11 @@ def generate(job: Job):
                         ),
                     )
 
-                # prendre le *_facebook.txt le plus récent
                 candidates = sorted(
                     out_dir.glob("*_facebook.txt"),
                     key=lambda x: x.stat().st_mtime,
                     reverse=True
                 )
-
                 if not candidates:
                     generated = [x.name for x in out_dir.glob("*")]
                     raise HTTPException(
@@ -243,11 +274,20 @@ def generate(job: Job):
                         ),
                     )
 
-                best = candidates[0]
-                full = best.read_text(encoding="utf-8", errors="ignore")
+                full = candidates[0].read_text(encoding="utf-8", errors="ignore")
+
+                # Step 4: archive outputs
+                fb_path = f"with/{stock}_facebook.txt"
+                mp_path = f"with/{stock}_marketplace.txt"  # temporaire: même texte
+                outputs_put(fb_path, full)
+                outputs_put(mp_path, full)
+                outputs_upsert(stock, "with", fb_path, mp_path)
+
                 return {"slug": job.slug, "facebook_text": _clip_800(full)}
 
-        # --- Fallback: texte court (sans options) ---
+        # ==========================
+        # WITHOUT (fallback)
+        # ==========================
         base = f"🔥 {title} 🔥\n\n"
         if price:
             base += f"💥 {price} 💥\n"
@@ -255,10 +295,19 @@ def generate(job: Job):
             base += f"📊 {mileage}\n"
         if stock:
             base += f"🧾 Stock : {stock}\n"
+
         # IMPORTANT: pas de lien Chrysler dans WITHOUT/fallback.
-        # On mentionne le sticker seulement si on l'a déjà en cache Supabase.
+        # On mentionne le sticker seulement si déjà en cache.
         if has_sticker_cached(vin):
             base += "🧾 Window Sticker : disponible sur demande\n"
+
+        # Step 4: archive outputs
+        fb_path = f"without/{stock}_facebook.txt"
+        mp_path = f"without/{stock}_marketplace.txt"
+        outputs_put(fb_path, base)
+        outputs_put(mp_path, base)
+        outputs_upsert(stock, "without", fb_path, mp_path)
+
         return {"slug": job.slug, "facebook_text": _clip_800(base)}
 
     except HTTPException:
