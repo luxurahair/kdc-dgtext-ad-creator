@@ -44,8 +44,7 @@ def _looks_like_vin(v: str) -> bool:
 # ==========================
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-STICKER_BUCKET = os.getenv("SUPABASE_STICKER_BUCKET", "window-stickers").strip()
-
+STICKER_BUCKET = os.getenv("SB_BUCKET_STICKERS", "kennebec-stickers").strip()
 _sb = None
 
 
@@ -65,6 +64,22 @@ def _sticker_obj_path(vin: str) -> str:
 def is_pdf_ok(b: bytes) -> bool:
     # Règle officielle: <10KB = mauvais, et doit commencer par %PDF
     return bool(b) and len(b) >= 10_240 and b[:4] == b"%PDF"
+
+
+def has_sticker_cached(vin: str) -> bool:
+    """
+    True si un PDF validé existe déjà dans Supabase Storage.
+    Ne télécharge rien, ne fait aucun appel Chrysler.
+    """
+    vin = (vin or "").strip().upper()
+    if not _looks_like_vin(vin):
+        return False
+    obj_path = _sticker_obj_path(vin)
+    try:
+        data = sb().storage.from_(STICKER_BUCKET).download(obj_path)
+        return is_pdf_ok(data)
+    except Exception:
+        return False
 
 
 def get_or_fetch_sticker_pdf(vin: str) -> Path:
@@ -240,9 +255,10 @@ def generate(job: Job):
             base += f"📊 {mileage}\n"
         if stock:
             base += f"🧾 Stock : {stock}\n"
-        if _looks_like_vin(vin):
-            base += f"🧾 Window Sticker : https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}\n"
-
+        # IMPORTANT: pas de lien Chrysler dans WITHOUT/fallback.
+        # On mentionne le sticker seulement si on l'a déjà en cache Supabase.
+        if has_sticker_cached(vin):
+            base += "🧾 Window Sticker : disponible sur demande\n"
         return {"slug": job.slug, "facebook_text": _clip_800(base)}
 
     except HTTPException:
