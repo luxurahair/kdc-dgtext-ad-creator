@@ -62,35 +62,37 @@ def _sticker_obj_path(vin: str) -> str:
     return f"{vin.upper()}.pdf"
 
 
+def is_pdf_ok(b: bytes) -> bool:
+    # Règle officielle: <10KB = mauvais, et doit commencer par %PDF
+    return bool(b) and len(b) >= 10_240 and b[:4] == b"%PDF"
+
+
 def get_or_fetch_sticker_pdf(vin: str) -> Path:
     """
     Retourne un PDF local (tmp) en:
-    1) essayant Supabase Storage (bucket window-stickers)
+    1) essayant Supabase Storage (bucket STICKER_BUCKET)
     2) sinon télécharge Chrysler et upload en cache
+    3) fallback lookup si Chrysler direct invalide
     """
     vin = (vin or "").strip().upper()
     if not _looks_like_vin(vin):
         raise RuntimeError("VIN invalide")
 
-    obj_path = _sticker_obj_path(vin)
+    obj_path = _sticker_obj_path(vin)  # garde ta convention actuelle
     tmp_dir = Path(tempfile.mkdtemp(prefix="kb_pdf_"))
-    local_pdf = tmp_dir / obj_path
+    local_pdf = tmp_dir / Path(obj_path).name  # évite sous-dossiers tmp inutiles
 
     # 1) download depuis Supabase Storage
     try:
         data = sb().storage.from_(STICKER_BUCKET).download(obj_path)
-        if data and len(data) > 60_000 and data[:4] == b"%PDF":
+        if is_pdf_ok(data):
             local_pdf.write_bytes(data)
             return local_pdf
     except Exception:
         pass
 
-        def is_pdf_ok(b: bytes) -> bool:
-        return bool(b) and len(b) > 60_000 and b[:4] == b"%PDF"
-
     # 2) Chrysler direct (timeout plus court)
     pdf_url = f"https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}"
-    c = b""
     try:
         r = requests.get(pdf_url, timeout=20)
         c = r.content or b""
@@ -135,10 +137,10 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
             {"content-type": "application/pdf", "upsert": "true"},
         )
     except Exception:
+        # pas fatal : on continue avec le PDF local
         pass
 
     return local_pdf
-
 
 # ==========================
 # Routes
