@@ -152,9 +152,9 @@ def version():
         "sticker_bucket": STICKER_BUCKET,
         "outputs_bucket": OUTPUTS_BUCKET,
         "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
+        "build": "tryexcept-2026-01-18-1",
     }
-
-
+       
 @app.post("/generate")
 def generate(job: Job):
     try:
