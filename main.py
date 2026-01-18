@@ -172,9 +172,17 @@ def generate(job: Job):
         # WITH (sticker_to_ad)
         # ==========================
         if _looks_like_vin(vin) and price and mileage and stock:
-            pdf_path = get_or_fetch_sticker_pdf(vin)
+            try:
+                pdf_path = get_or_fetch_sticker_pdf(vin)
+            except Exception:
+                pdf_path = None
 
-            with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
+           if pdf_path:
+               with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
+                   ...
+                   return {"slug": job.slug, "facebook_text": _clip_800(full)}
+       
+        with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
                 out_dir = Path(td)
 
                 script = Path(__file__).resolve().parent / "engine" / "sticker_to_ad.py"
