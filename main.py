@@ -63,9 +63,7 @@ def sb():
 # Sticker helpers
 # ==========================
 def _sticker_obj_path(vin: str) -> str:
-    # NOTE: on garde la convention actuelle: <VIN>.pdf à la racine du bucket
-    # (on migrera vers pdf_ok/<VIN>.pdf plus tard si tu veux)
-    return f"{vin.upper()}.pdf"
+    return f"pdf_ok/{vin.upper()}.pdf"
 
 
 def is_pdf_ok(b: bytes) -> bool:
