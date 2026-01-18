@@ -169,20 +169,17 @@ def generate(job: Job):
             raise HTTPException(400, "vehicle.title manquant")
 
         # ==========================
-        # WITH (sticker_to_ad)
+        # WITH (sticker_to_ad) - cache-only
         # ==========================
+        pdf_path = None
         if _looks_like_vin(vin) and price and mileage and stock:
             try:
                 pdf_path = get_or_fetch_sticker_pdf(vin)
             except Exception:
                 pdf_path = None
 
-           if pdf_path:
-               with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
-                   ...
-                   return {"slug": job.slug, "facebook_text": _clip_800(full)}
-       
-        with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
+        if pdf_path:
+            with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
                 out_dir = Path(td)
 
                 script = Path(__file__).resolve().parent / "engine" / "sticker_to_ad.py"
@@ -233,9 +230,9 @@ def generate(job: Job):
 
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
 
-                # Step 4: archive outputs
+                # archive outputs (WITH)
                 fb_path = f"with/{stock}_facebook.txt"
-                mp_path = f"with/{stock}_marketplace.txt"  # temporaire: même texte
+                mp_path = f"with/{stock}_marketplace.txt"  # temporaire
                 outputs_put(fb_path, full)
                 outputs_put(mp_path, full)
                 outputs_upsert(stock, "with", fb_path, mp_path)
@@ -253,12 +250,11 @@ def generate(job: Job):
         if stock:
             base += f"🧾 Stock : {stock}\n"
 
-        # IMPORTANT: pas de lien Chrysler dans WITHOUT/fallback.
-        # On mentionne le sticker seulement si déjà en cache.
+        # Pas de lien Chrysler. On mentionne seulement si déjà en cache.
         if has_sticker_cached(vin):
             base += "🧾 Window Sticker : disponible sur demande\n"
 
-        # Step 4: archive outputs
+        # archive outputs (WITHOUT)
         fb_path = f"without/{stock}_facebook.txt"
         mp_path = f"without/{stock}_marketplace.txt"
         outputs_put(fb_path, base)
