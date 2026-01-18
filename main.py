@@ -232,7 +232,7 @@ def generate(job: Job):
 
                 # archive outputs (WITH)
                 fb_path = f"with/{stock}_facebook.txt"
-                mp_path = f"with/{stock}_marketplace.txt"  # temporaire
+                mp_path = f"with/{stock}_marketplace.txt"  # temporaire: même texte
                 outputs_put(fb_path, full)
                 outputs_put(mp_path, full)
                 outputs_upsert(stock, "with", fb_path, mp_path)
