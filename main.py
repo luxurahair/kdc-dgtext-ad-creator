@@ -7,7 +7,6 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict
 
-import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from supabase import create_client
@@ -92,10 +91,8 @@ def has_sticker_cached(vin: str) -> bool:
 
 def get_or_fetch_sticker_pdf(vin: str) -> Path:
     """
-    Retourne un PDF local (tmp) en:
-    1) essayant Supabase Storage (bucket STICKER_BUCKET)
-    2) sinon télécharge Chrysler et upload en cache
-    3) fallback lookup si Chrysler direct invalide
+    Cache-only: retourne un PDF local (tmp) UNIQUEMENT depuis Supabase Storage.
+    Aucun appel Chrysler / aucun lookup ici.
     """
     vin = (vin or "").strip().upper()
     if not _looks_like_vin(vin):
@@ -105,63 +102,15 @@ def get_or_fetch_sticker_pdf(vin: str) -> Path:
     tmp_dir = Path(tempfile.mkdtemp(prefix="kb_pdf_"))
     local_pdf = tmp_dir / Path(obj_path).name
 
-    # 1) download depuis Supabase Storage
     try:
         data = sb().storage.from_(STICKER_BUCKET).download(obj_path)
-        if is_pdf_ok(data):
-            local_pdf.write_bytes(data)
-            return local_pdf
     except Exception:
-        pass
+        raise RuntimeError("Sticker absent du cache Supabase")
 
-    # 2) Chrysler direct
-    pdf_url = f"https://www.chrysler.com/hostd/windowsticker/getWindowStickerPdf.do?vin={vin}"
-    try:
-        r = requests.get(pdf_url, timeout=20)
-        c = r.content or b""
-    except Exception:
-        c = b""
+    if not is_pdf_ok(data):
+        raise RuntimeError("Sticker présent mais invalide")
 
-    # 3) Fallback lookup si direct invalide
-    if not is_pdf_ok(c):
-        lookup_url = "https://windowstickerlookup.com"
-        r2 = requests.get(
-            lookup_url,
-            params={"make": "chrysler", "vin": vin},
-            timeout=20,
-            headers={"User-Agent": "Mozilla/5.0", "Accept": "text/html,*/*"},
-        )
-        html = (r2.text or "")
-
-        m_pdf = re.search(r'(https?://[^\s"\']+\.pdf)', html, re.IGNORECASE)
-        m_ch = re.search(
-            r'(https?://www\.chrysler\.com/hostd/windowsticker/getWindowStickerPdf\.do\?vin=[A-HJ-NPR-Z0-9]{17})',
-            html,
-            re.IGNORECASE,
-        )
-        pdf2 = m_pdf.group(1) if m_pdf else (m_ch.group(1) if m_ch else None)
-        if not pdf2:
-            raise RuntimeError("Sticker indisponible (aucun lien PDF via lookup)")
-
-        r3 = requests.get(pdf2, timeout=20)
-        c = r3.content or b""
-
-        if not is_pdf_ok(c):
-            raise RuntimeError("Sticker indisponible (PDF fallback invalide)")
-
-    # PDF validé
-    local_pdf.write_bytes(c)
-
-    # upload Supabase Storage (cache durable)
-    try:
-        sb().storage.from_(STICKER_BUCKET).upload(
-            obj_path,
-            c,
-            {"content-type": "application/pdf", "upsert": "true"},
-        )
-    except Exception:
-        pass
-
+    local_pdf.write_bytes(data)
     return local_pdf
 
 
