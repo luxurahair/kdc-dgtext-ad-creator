@@ -134,6 +134,13 @@ def outputs_upsert(stock: str, kind: str, fb_path: str, mp_path: str) -> None:
     ).execute()
 
 
+def outputs_remove(path: str) -> None:
+    try:
+        sb().storage.from_(OUTPUTS_BUCKET).remove([path])
+    except Exception:
+        pass
+
+
 # ==========================
 # Routes
 # ==========================
@@ -234,6 +241,9 @@ def generate(job: Job):
                 outputs_put(fb_path, full)
                 outputs_put(mp_path, full)
                 outputs_upsert(stock, "with", fb_path, mp_path)
+                # Nettoyage: WITH écrase WITHOUT
+                outputs_remove(f"without/{stock}_facebook.txt")
+                outputs_remove(f"without/{stock}_marketplace.txt")
 
                 return {"slug": job.slug, "facebook_text": _clip_800(full)}
 
@@ -258,7 +268,7 @@ def generate(job: Job):
         outputs_put(fb_path, base)
         outputs_put(mp_path, base)
         outputs_upsert(stock, "without", fb_path, mp_path)
-
+     
         return {"slug": job.slug, "facebook_text": _clip_800(base)}
 
     except HTTPException:
