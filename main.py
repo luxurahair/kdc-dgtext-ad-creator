@@ -27,6 +27,7 @@ class Job(BaseModel):
 # Helpers
 # ==========================
 def _clip_800(txt: str) -> str:
+    """Garde pour plus tard (Marketplace). NE PAS utiliser pour Facebook."""
     t = (txt or "").strip()
     if len(t) <= 800:
         return t + "\n"
@@ -159,7 +160,8 @@ def version():
         "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
         "build": "tryexcept-2026-01-18-1",
     }
-       
+
+
 @app.post("/generate")
 def generate(job: Job):
     try:
@@ -219,7 +221,7 @@ def generate(job: Job):
                 candidates = sorted(
                     out_dir.glob("*_facebook.txt"),
                     key=lambda x: x.stat().st_mtime,
-                    reverse=True
+                    reverse=True,
                 )
                 if not candidates:
                     generated = [x.name for x in out_dir.glob("*")]
@@ -235,16 +237,6 @@ def generate(job: Job):
 
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
 
-               # archive outputs (WITH)
-               fb_path = f"with/{stock}_facebook.txt"
-               mp_path = f"with/{stock}_marketplace.txt"
-               outputs_put(fb_path, full)
-               outputs_put(mp_path, full)
-               outputs_upsert(stock, "with", fb_path, mp_path)
-
-               # Nettoyage: WITH écrase WITHOUT
-               outputs_remove(f"without/{stock}_facebook.txt")
-               outputs_remove(f"without/{stock}_marketplace.txt")
 
                return {"slug": job.slug, "facebook_text": full}
         # ==========================
@@ -268,7 +260,7 @@ def generate(job: Job):
         outputs_put(fb_path, base)
         outputs_put(mp_path, base)
         outputs_upsert(stock, "without", fb_path, mp_path)
-     
+
         return {"slug": job.slug, "facebook_text": base}
 
     except HTTPException:
@@ -276,3 +268,4 @@ def generate(job: Job):
     except Exception:
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=tb[-2000:])
+
