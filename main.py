@@ -235,18 +235,18 @@ def generate(job: Job):
 
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
 
-                # archive outputs (WITH)
-                fb_path = f"with/{stock}_facebook.txt"
-                mp_path = f"with/{stock}_marketplace.txt"  # temporaire: même texte
-                outputs_put(fb_path, full)
-                outputs_put(mp_path, full)
-                outputs_upsert(stock, "with", fb_path, mp_path)
-                # Nettoyage: WITH écrase WITHOUT
-                outputs_remove(f"without/{stock}_facebook.txt")
-                outputs_remove(f"without/{stock}_marketplace.txt")
+               # archive outputs (WITH)
+               fb_path = f"with/{stock}_facebook.txt"
+               mp_path = f"with/{stock}_marketplace.txt"
+               outputs_put(fb_path, full)
+               outputs_put(mp_path, full)
+               outputs_upsert(stock, "with", fb_path, mp_path)
 
-                return {"slug": job.slug, "facebook_text": _clip_800(full)}
+               # Nettoyage: WITH écrase WITHOUT
+               outputs_remove(f"without/{stock}_facebook.txt")
+               outputs_remove(f"without/{stock}_marketplace.txt")
 
+               return {"slug": job.slug, "facebook_text": full}
         # ==========================
         # WITHOUT (fallback)
         # ==========================
@@ -269,7 +269,7 @@ def generate(job: Job):
         outputs_put(mp_path, base)
         outputs_upsert(stock, "without", fb_path, mp_path)
      
-        return {"slug": job.slug, "facebook_text": _clip_800(base)}
+        return {"slug": job.slug, "facebook_text": base}
 
     except HTTPException:
         raise
