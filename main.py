@@ -182,8 +182,12 @@ def generate(job: Job):
         if _looks_like_vin(vin) and price and mileage and stock:
             try:
                 pdf_path = get_or_fetch_sticker_pdf(vin)
-            except Exception:
+                print(f"WITH_OK vin={vin} path=pdf_ok/{vin}.pdf stock={stock}")
+            except Exception as e:
+                print(f"WITH_SKIP vin={vin} path=pdf_ok/{vin}.pdf stock={stock} err={e}")
                 pdf_path = None
+        else:
+            print(f"WITH_SKIP vin={vin} stock={stock} (vin invalide ou price/mileage/stock manquant)")
 
         if pdf_path:
             with tempfile.TemporaryDirectory(prefix="kb_sticker_") as td:
