@@ -236,9 +236,7 @@ def generate(job: Job):
                     )
 
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
-
-
-               return {"slug": job.slug, "facebook_text": full}
+                return {"slug": job.slug, "facebook_text": full}
         # ==========================
         # WITHOUT (fallback)
         # ==========================
