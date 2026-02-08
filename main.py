@@ -207,6 +207,8 @@ def generate(job: Job):
                     "--vin", vin,
                 ]
 
+                print(f"WITH_RUN sticker_to_ad vin={vin} stock={stock}")
+
                 try:
                     p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
                 except subprocess.TimeoutExpired:
@@ -241,9 +243,13 @@ def generate(job: Job):
 
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
                 return {"slug": job.slug, "facebook_text": full}
+
         # ==========================
         # WITHOUT (fallback)
         # ==========================
+        cached = has_sticker_cached(vin)
+        print(f"WITHOUT_USED vin={vin} stock={stock} has_cached={cached}")
+
         base = f"🔥 {title} 🔥\n\n"
         if price:
             base += f"💥 {price} 💥\n"
@@ -253,7 +259,7 @@ def generate(job: Job):
             base += f"🧾 Stock : {stock}\n"
 
         # Pas de lien Chrysler. On mentionne seulement si déjà en cache.
-        if has_sticker_cached(vin):
+        if cached:
             base += "🧾 Window Sticker : disponible sur demande\n"
 
         # archive outputs (WITHOUT)
@@ -270,4 +276,3 @@ def generate(job: Job):
     except Exception:
         tb = traceback.format_exc()
         raise HTTPException(status_code=500, detail=tb[-2000:])
-
