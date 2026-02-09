@@ -5,4 +5,3 @@ uvicorn[standard]==0.30.6
 pydantic
 pdfminer.six
 supabase
-playwright==1.49.0
