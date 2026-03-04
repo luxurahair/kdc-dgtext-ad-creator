@@ -10,6 +10,7 @@ from typing import Any, Dict
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from supabase import create_client
+from engine.dg_text import build_facebook_dg, build_marketplace_dg
 
 app = FastAPI(title="kenbot-text-engine", version="1.0")
 
