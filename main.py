@@ -121,7 +121,10 @@ def outputs_put(path: str, content: str) -> None:
     sb().storage.from_(OUTPUTS_BUCKET).upload(
         path,
         content.encode("utf-8"),
-        {"content-type": "text/plain; charset=utf-8", "upsert": "true"},
+        {
+            "content-type": "text/plain; charset=utf-8",
+            "x-upsert": "true",
+        },
     )
 
 
