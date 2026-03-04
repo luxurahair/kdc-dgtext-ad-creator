@@ -245,33 +245,32 @@ def generate(job: Job):
                 full = candidates[0].read_text(encoding="utf-8", errors="ignore")
                 return {"slug": job.slug, "facebook_text": full}
 
-        # ==========================
-        # WITHOUT (fallback)
+                # ==========================
+        # WITHOUT (fallback) => DG TEXT LONG (match parfait)
         # ==========================
         cached = has_sticker_cached(vin)
         print(f"WITHOUT_USED vin={vin} stock={stock} has_cached={cached}")
 
-        base = f"🔥 {title} 🔥\n\n"
-        if price:
-            base += f"💥 {price} 💥\n"
-        if mileage:
-            base += f"📊 {mileage}\n"
-        if stock:
-            base += f"🧾 Stock : {stock}\n"
+        # Normalise vehicle pour DG
+        vehicle = dict(v)
+        vehicle["title"] = title
+        vehicle["price"] = price
+        vehicle["mileage"] = mileage
+        vehicle["stock"] = stock
+        vehicle["vin"] = vin
 
-        # Pas de lien Chrysler. On mentionne seulement si déjà en cache.
-        if cached:
-            base += "🧾 Window Sticker : disponible sur demande\n"
+        fb_text = build_facebook_dg(vehicle)
+        mp_text = build_marketplace_dg(vehicle)
 
         # archive outputs (WITHOUT)
         fb_path = f"without/{stock}_facebook.txt"
         mp_path = f"without/{stock}_marketplace.txt"
-        outputs_put(fb_path, base)
-        outputs_put(mp_path, base)
+        outputs_put(fb_path, fb_text)
+        outputs_put(mp_path, mp_text)
         outputs_upsert(stock, "without", fb_path, mp_path)
 
-        return {"slug": job.slug, "facebook_text": base}
-
+        return {"slug": job.slug, "facebook_text": fb_text}
+        
     except HTTPException:
         raise
     except Exception:
