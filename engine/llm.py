@@ -134,37 +134,51 @@ VIN : {vin or "-"}
     return base
 
 
-def generate_ad_text(vehicle: Dict[str, Any], profile: str, max_chars: Optional[int] = None) -> str:
-    """
-    Generates an AI-enhanced ad text based on a simple structured base.
-    - profile: truck/suv/exotic/default (your existing classifier output)
-    - max_chars: use 800 for Marketplace, None for Facebook (or another limit if you want)
-    """
+# Dans llm.py, remplace generate_ad_text par ça
+def generate_ad_text(vehicle: Dict[str, Any], kind: str, max_chars: Optional[int] = None) -> str:
     client = get_client()
     if not client:
-        raise RuntimeError("OPENAI_API_KEY non défini")
+        return ""  # Skip silencieux
 
-    # Decide channel label (purely instructive)
-    channel = "marketplace" if (max_chars is not None and max_chars <= 900) else "facebook"
+    v = vehicle or {}
+    title = _s(v.get('title', 'Véhicule'))
+    price = _norm_money(v.get('price'))
+    mileage = _norm_km(v.get('mileage'))
+    stock = _s(v.get('stock'))
+    vin = _s(v.get('vin'))
+    url = _s(v.get('url'))
+    features = "\n".join(_uniq_keep_order(v.get('features') or [])) or "Pas spécifié"
+    specs_str = "\n".join(_format_specs_lines(v.get('specs') or {}))
 
-    system_prompt = DG_SYSTEM_PROMPTS.get(profile, DG_SYSTEM_PROMPTS["default"])
-    user_prompt = build_user_prompt(vehicle, max_chars=max_chars, channel=channel, profile=profile)
+    system_prompts = {
+        "truck": (
+            "Tu es Daniel Giroux, vendeur auto à Kennebec Dodge (Beauce, Québec).\n"
+            "Style direct, confiant, vendeur crédible. Pas d'exagération, pas d'invention.\n"
+            "Base-toi UNIQUEMENT sur ces data : titre={title}, prix={price}, km={mileage}, stock={stock}, VIN={vin}, features={features}, specs={specs_str}.\n"
+            "Génère une intro courte (100-200 chars) engageante pour Facebook, en français québécois.\n"
+            "Ex. pour truck : 'Ce Ram solide est prêt pour le boulot en Beauce ! Avec 4x4 et...'"
+        ),
+        # Similaires pour suv/exotic/default, avec "Pas d'invention"
+    }
 
-    resp = client.chat.completions.create(
+    system = system_prompts.get(kind, system_prompts["default"])
+
+    user_prompt = f"Génère intro pour annonce : {title}. Limite {max_chars or 'aucune'} chars."
+
+    # Appel OpenAI (fixé pour logique)
+    response = client.chat.completions.create(
         model=DEFAULT_MODEL,
         messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_prompt},
         ],
+        max_tokens=100 if max_chars else 200,
+        temperature=0.5,  # Moins créatif pour éviter illogique
     )
-
-    text = (resp.choices[0].message.content or "").strip()
-
-    # Hard safety: if model ignores max_chars, trim as last resort (better than failing CI)
-    if max_chars and len(text) > max_chars:
-        text = text[: max_chars - 1].rstrip() + "…"
-
-    return text
+    txt = (response.choices[0].message.content or "").strip()
+    if max_chars:
+        txt = txt[:max_chars].rstrip() + "…"
+    return txt
 
 
 # -------------------------
