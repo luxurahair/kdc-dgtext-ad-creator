@@ -204,8 +204,8 @@ def build_facebook_dg(vehicle: Dict[str, Any], sticker_lines: Optional[List[str]
     # Nouveau : Option AI intro (si env key)
     if os.getenv("OPENAI_API_KEY"):
         try:
-            from llm import generate_ad_text  # Assume dans engine
-            from classifier import classify
+            from .llm import generate_ad_text
+            from .classifier import classify
             kind = classify(vehicle)
             ai_intro = generate_ad_text(vehicle, kind, max_chars=200)  # Intro naturelle
             lines.append(ai_intro)
