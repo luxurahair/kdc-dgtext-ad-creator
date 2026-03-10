@@ -164,34 +164,49 @@ def version():
         "has_supabase": bool(SUPABASE_URL and SUPABASE_KEY),
         "build": "tryexcept-2026-01-18-1",
     }
-
-
 @app.post("/generate")
 def generate(job: Job):
     try:
         v = job.vehicle or {}
-        title = (v.get("title") or "").strip()
-        # Remplace ces lignes
+
+        # Normalisation robuste des champs
+        title = str(v.get("title") or "").strip()
+        if not title:
+            raise HTTPException(400, "vehicle.title manquant")
+
+        # Price : accepte int/float ou string
         price_raw = v.get("price")
         if price_raw is None:
             price = ""
         elif isinstance(price_raw, (int, float)):
-            price = f"{price_raw:,}".replace(",", " ")  # 38995 → "38 995"
+            price = f"{price_raw:,}".replace(",", " ") + " $"  # 38995 → "38 995 $"
         else:
             price = str(price_raw).strip()
 
+        # Mileage : accepte int/float ou string
         mileage_raw = v.get("mileage")
         if mileage_raw is None:
             mileage = ""
         elif isinstance(mileage_raw, (int, float)):
-            mileage = f"{mileage_raw:,}".replace(",", " ") + " km"
+            mileage = f"{mileage_raw:,}".replace(",", " ") + " km"  # 12500 → "12 500 km"
         else:
             mileage = str(mileage_raw).strip()
-        stock = (v.get("stock") or "").strip().upper() or job.slug.strip().upper()
+
+        stock = (v.get("stock") or job.slug or "").strip().upper()
         vin = (v.get("vin") or "").strip().upper()
 
-        if not title:
-            raise HTTPException(400, "vehicle.title manquant")
+        # Le reste de ton code (WITH sticker, WITHOUT fallback, etc.)
+        # ... (pas de changement ici)
+
+        # À la fin :
+        return {"slug": job.slug, "facebook_text": fb_text or sticker_text}
+
+    except HTTPException:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=tb[-2000:])
+
 
         # ==========================
         # WITH (sticker_to_ad) - cache-only
