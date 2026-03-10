@@ -1,10 +1,10 @@
+pydantic>=2.7.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
 httpx==0.24.1
 openai==1.40.0
-requests==2.31.0
-beautifulsoup4==4.12.3
-python-dotenv==1.0.0
+requests
+beautifulsoup4
+python-dotenv
+pdfminer.six
 supabase
-pydantic>=2.7.0
-pdfminer.six==20231228
-fastapi>=0.115.0
-uvicorn>=0.30.0
