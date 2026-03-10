@@ -9,3 +9,4 @@ python-dotenv
 pdfminer.six
 supabase==2.8.1
 gotrue==2.8.1
+playwright>=1.49.0
