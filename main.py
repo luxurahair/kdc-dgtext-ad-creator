@@ -171,8 +171,20 @@ def generate(job: Job):
     try:
         v = job.vehicle or {}
         title = (v.get("title") or "").strip()
-        price = (v.get("price") or "").strip()
-        mileage = (v.get("mileage") or "").strip()
+        price_raw = v.get("price")
+        if price_raw is None:
+            price = ""
+        elif isinstance(price_raw, (int, float)):
+            price = f"{price_raw:,}".replace(",", " ")  # 38995 → "38 995"
+        else:
+            price = str(price_raw).strip()
+        mileage_raw = v.get("mileage")
+        if mileage_raw is None:
+            mileage = ""
+        elif isinstance(mileage_raw, (int, float)):
+            mileage = f"{mileage_raw:,}".replace(",", " ") + " km"
+        else:
+            mileage = str(mileage_raw).strip()
         stock = (v.get("stock") or "").strip().upper() or job.slug.strip().upper()
         vin = (v.get("vin") or "").strip().upper()
 
