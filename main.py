@@ -171,6 +171,7 @@ def generate(job: Job):
     try:
         v = job.vehicle or {}
         title = (v.get("title") or "").strip()
+        # Remplace ces lignes
         price_raw = v.get("price")
         if price_raw is None:
             price = ""
@@ -178,6 +179,7 @@ def generate(job: Job):
             price = f"{price_raw:,}".replace(",", " ")  # 38995 → "38 995"
         else:
             price = str(price_raw).strip()
+
         mileage_raw = v.get("mileage")
         if mileage_raw is None:
             mileage = ""
