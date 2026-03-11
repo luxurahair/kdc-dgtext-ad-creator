@@ -167,47 +167,26 @@ def version():
     
 @app.post("/generate")
 def generate(job: Job):
+    """
+    Génère le texte Facebook.
+    Priorité:
+      1) WITH sticker_to_ad si vin + price + mileage + stock et PDF ok en cache
+      2) WITHOUT fallback DG text (match parfait)
+    """
     try:
+        fb_text = ""
+        sticker_text = ""
+
         v = job.vehicle or {}
 
-        # Normalisation robuste des champs
-        title = str(v.get("title") or "").strip()
+        title = (v.get("title") or "").strip()
         if not title:
             raise HTTPException(400, "vehicle.title manquant")
 
-        # Price : accepte int/float ou string
-        price_raw = v.get("price")
-        if price_raw is None:
-            price = ""
-        elif isinstance(price_raw, (int, float)):
-            price = f"{price_raw:,}".replace(",", " ") + " $"  # 38995 → "38 995 $"
-        else:
-            price = str(price_raw).strip()
-
-        # Mileage : accepte int/float ou string
-        mileage_raw = v.get("mileage")
-        if mileage_raw is None:
-            mileage = ""
-        elif isinstance(mileage_raw, (int, float)):
-            mileage = f"{mileage_raw:,}".replace(",", " ") + " km"  # 12500 → "12 500 km"
-        else:
-            mileage = str(mileage_raw).strip()
-
-        stock = (v.get("stock") or job.slug or "").strip().upper()
+        price = (v.get("price") or "").strip()
+        mileage = (v.get("mileage") or "").strip()
+        stock = (v.get("stock") or "").strip().upper() or (job.slug or "").strip().upper()
         vin = (v.get("vin") or "").strip().upper()
-
-        # Le reste de ton code (WITH sticker, WITHOUT fallback, etc.)
-        # ... (pas de changement ici)
-
-        # À la fin :
-        return {"slug": job.slug, "facebook_text": fb_text or sticker_text}
-
-    except HTTPException:
-        raise
-    except Exception:
-        tb = traceback.format_exc()
-        raise HTTPException(status_code=500, detail=tb[-2000:])
-
 
         # ==========================
         # WITH (sticker_to_ad) - cache-only
@@ -218,7 +197,7 @@ def generate(job: Job):
                 pdf_path = get_or_fetch_sticker_pdf(vin)
                 print(f"WITH_OK vin={vin} path=pdf_ok/{vin}.pdf stock={stock}")
             except Exception as e:
-                print(f"WITH_SKIP vin={vin} path=pdf_ok/{vin}.pdf stock={stock} err={e}")
+                print(f"WITH_SKIP vin={vin} stock={stock} err={e}")
                 pdf_path = None
         else:
             print(f"WITH_SKIP vin={vin} stock={stock} (vin invalide ou price/mileage/stock manquant)")
@@ -247,6 +226,74 @@ def generate(job: Job):
                     p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
                 except subprocess.TimeoutExpired:
                     raise HTTPException(500, "sticker_to_ad timeout (25s)")
+
+                if p.returncode != 0:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"sticker_to_ad failed (code={p.returncode})\n"
+                            f"STDERR:\n{(p.stderr or '')[-1200:]}\n"
+                            f"STDOUT:\n{(p.stdout or '')[-1200:]}"
+                        ),
+                    )
+
+                candidates = sorted(
+                    out_dir.glob("*_facebook.txt"),
+                    key=lambda x: x.stat().st_mtime,
+                    reverse=True,
+                )
+                if not candidates:
+                    generated = [x.name for x in out_dir.glob("*")]
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "sticker_to_ad: aucun *_facebook.txt généré\n"
+                            f"generated={generated}\n"
+                            f"STDERR:\n{(p.stderr or '')[-800:]}\n"
+                            f"STDOUT:\n{(p.stdout or '')[-800:]}"
+                        ),
+                    )
+
+                sticker_text = candidates[0].read_text(encoding="utf-8", errors="ignore").strip()
+
+                # Retour immédiat si on a un texte sticker valide
+                if sticker_text:
+                    return {"slug": job.slug, "facebook_text": sticker_text}
+
+        # ==========================
+        # WITHOUT (fallback) => DG TEXT LONG (match parfait)
+        # ==========================
+        cached = has_sticker_cached(vin)
+        print(f"WITHOUT_USED vin={vin} stock={stock} has_cached={cached}")
+
+        vehicle = dict(v)
+        vehicle["title"] = title
+        vehicle["price"] = price
+        vehicle["mileage"] = mileage
+        vehicle["stock"] = stock
+        vehicle["vin"] = vin
+
+        fb_text = (build_facebook_dg(vehicle) or "").strip()
+        mp_text = (build_marketplace_dg(vehicle) or "").strip()
+
+        # Archive outputs (WITHOUT)
+        fb_path = f"without/{stock}_facebook.txt"
+        mp_path = f"without/{stock}_marketplace.txt"
+        outputs_put(fb_path, fb_text)
+        outputs_put(mp_path, mp_text)
+        outputs_upsert(stock, "without", fb_path, mp_path)
+
+        out = (fb_text or "").strip()
+        if not out:
+            raise HTTPException(500, "generate: empty facebook_text")
+
+        return {"slug": job.slug, "facebook_text": out}
+
+    except HTTPException:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=tb[-2000:])
 
                 if p.returncode != 0:
                     raise HTTPException(
