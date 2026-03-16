@@ -3,7 +3,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from ad_builder import is_allowed_stellantis_brand
+def is_allowed_stellantis_brand(txt: str) -> bool:
+    low = (txt or "").lower()
+    allowed = (
+        "ram", "dodge", "jeep", "chrysler",
+        "alfa", "alfaromeo", "alfa romeo",
+        "fiat", "wagoneer"
+    )
+    return any(a in low for a in allowed)
 
 
 # --------------------------
